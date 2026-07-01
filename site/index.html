@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Content Pipeline — Agent Console</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #171a23; --panel2: #1e2230; --border: #2a2f40;
+    --text: #e8eaf0; --muted: #8b91a5; --accent: #6c8cff; --accent2: #3ddc97;
+    --danger: #ff6b6b; --warn: #ffc857;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 14px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { padding: 14px 28px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 18px; }
+  header h1 { font-size: 17px; font-weight: 600; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  nav { display: flex; gap: 6px; margin-left: 18px; }
+  nav button { background: transparent; border: 1px solid transparent; color: var(--muted); font-weight: 500; padding: 7px 16px; border-radius: 8px; }
+  nav button.active { background: var(--panel2); color: var(--text); border-color: var(--border); }
+  #settingsBtn { margin-left: auto; }
+  main { display: grid; grid-template-columns: 340px 1fr; min-height: calc(100vh - 60px); }
+  #sidebar { border-right: 1px solid var(--border); padding: 18px; overflow-y: auto; }
+  #detail { padding: 24px 32px; overflow-y: auto; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; cursor: pointer; transition: border-color .15s; position: relative; }
+  .card:hover, .card.active { border-color: var(--accent); }
+  .card .stage { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .card h3 { font-size: 15px; margin: 2px 0 4px; }
+  .card .role { color: var(--muted); font-size: 12px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; position: absolute; top: 16px; right: 14px; }
+  .dot.on { background: var(--accent2); } .dot.off { background: var(--muted); }
+  .arrow { text-align: center; color: var(--muted); margin: -6px 0 6px; font-size: 12px; }
+  h2 { font-size: 20px; margin-bottom: 4px; }
+  .muted { color: var(--muted); }
+  section { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-top: 18px; }
+  section h4 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 14px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; }
+  input[type=text], textarea, select { width: 100%; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 9px 12px; font: inherit; }
+  select { width: auto; min-width: 160px; }
+  textarea { min-height: 90px; resize: vertical; font-family: ui-monospace, monospace; font-size: 12.5px; }
+  button { background: var(--accent); border: 0; color: #fff; font: inherit; font-weight: 600; padding: 9px 18px; border-radius: 8px; cursor: pointer; }
+  button:hover { filter: brightness(1.1); }
+  button.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); font-weight: 400; }
+  button.run { background: var(--accent2); color: #06281a; }
+  button:disabled { opacity: .5; cursor: wait; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
+  .output { background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; white-space: pre-wrap; font-family: ui-monospace, monospace; font-size: 12.5px; max-height: 480px; overflow-y: auto; }
+  .runitem { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
+  .runitem summary { padding: 10px 14px; cursor: pointer; background: var(--panel2); font-size: 13px; }
+  .runitem .output { border: 0; border-radius: 0; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; background: var(--panel2); border: 1px solid var(--border); color: var(--muted); }
+  .status { font-size: 11px; font-weight: 600; padding: 2px 10px; border-radius: 20px; text-transform: uppercase; letter-spacing: .04em; }
+  .status.idea { background: #2a2f40; color: #aab2c8; }
+  .status.queued { background: #2b3a5e; color: #8fb0ff; }
+  .status.discussed { background: #4a3a1e; color: #ffc857; }
+  .status.published { background: #16412e; color: #3ddc97; }
+  .filterbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .filterbar button { font-size: 12px; padding: 4px 12px; font-weight: 500; }
+  .logitem { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .logitem:last-child { border-bottom: 0; }
+  .logitem .when { color: var(--muted); white-space: nowrap; font-size: 12px; min-width: 130px; }
+  #toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel2); border: 1px solid var(--accent); padding: 12px 18px; border-radius: 10px; display: none; z-index: 10; }
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 520px; max-width: 90vw; }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  .empty { color: var(--muted); padding: 40px; text-align: center; }
+  .spin { color: var(--accent2); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎙️ Content Pipeline</h1>
+  <nav>
+    <button id="tabAgents" class="active" onclick="switchTab('agents')">Agents</button>
+    <button id="tabTopics" onclick="switchTab('topics')">Topics</button>
+  </nav>
+  <span class="sub" id="tabSub">view, manage &amp; run your agents</span>
+  <button id="settingsBtn" class="ghost">⚙ API Settings</button>
+</header>
+<main>
+  <div id="sidebar"><div class="empty">Loading…</div></div>
+  <div id="detail"><div class="empty">Select an item.</div></div>
+</main>
+<div id="toast"></div>
+
+<dialog id="settings">
+  <h2 style="margin-bottom:10px">API Settings</h2>
+  <label>Lambda Function URL (backend API)</label>
+  <input type="text" id="apiUrl" placeholder="https://xxxx.lambda-url.us-west-2.on.aws/">
+  <div class="row" style="margin-top:16px; justify-content:flex-end">
+    <button class="ghost" onclick="document.getElementById('settings').close()">Cancel</button>
+    <button onclick="saveSettings()">Save</button>
+  </div>
+</dialog>
+
+<dialog id="newTopic">
+  <h2 style="margin-bottom:10px">New topic</h2>
+  <label>Title (paste a topic from the Research Agent, or write your own)</label>
+  <input type="text" id="ntTitle" placeholder="e.g. Why most AI product roadmaps fail: the missing 'human rollback' layer">
+  <label>Notes / description (optional)</label>
+  <textarea id="ntDesc" placeholder="Why it's interesting, angle ideas, source…"></textarea>
+  <div class="row" style="margin-top:16px; justify-content:flex-end">
+    <button class="ghost" onclick="document.getElementById('newTopic').close()">Cancel</button>
+    <button onclick="createTopic()">Add to inventory</button>
+  </div>
+</dialog>
+
+<script>
+const DEFAULT_API = "__API_URL__";
+let API = localStorage.getItem("apiUrl") || DEFAULT_API;
+let tab = "agents";
+let agents = [], selected = null;
+let topics = [], selectedTopic = null, topicFilter = "all";
+const STATUSES = ["idea", "queued", "discussed", "published"];
+const STATUS_LABEL = { idea: "💡 Idea", queued: "📋 Queued", discussed: "🎙️ Discussed", published: "✅ Published" };
+
+const $ = id => document.getElementById(id);
+const esc = s => (s ?? "").toString().replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const when = iso => iso ? new Date(iso).toLocaleString([], {month:"short", day:"numeric", hour:"2-digit", minute:"2-digit"}) : "";
+function toast(msg, ok=true) {
+  const t = $("toast"); t.textContent = msg; t.style.borderColor = ok ? "var(--accent2)" : "var(--danger)";
+  t.style.display = "block"; setTimeout(() => t.style.display = "none", 3500);
+}
+async function api(path, opts={}) {
+  if (!API || API.includes("__API_")) { $("settings").showModal(); throw new Error("Set the API URL first"); }
+  const r = await fetch(API.replace(/\/$/, "") + path, { headers: {"Content-Type":"application/json"}, ...opts });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || r.status);
+  return data;
+}
+function saveSettings() {
+  API = $("apiUrl").value.trim(); localStorage.setItem("apiUrl", API);
+  $("settings").close(); load();
+}
+$("settingsBtn").onclick = () => { $("apiUrl").value = API.includes("__API_") ? "" : API; $("settings").showModal(); };
+
+function switchTab(t) {
+  tab = t;
+  $("tabAgents").classList.toggle("active", t === "agents");
+  $("tabTopics").classList.toggle("active", t === "topics");
+  $("tabSub").textContent = t === "agents" ? "view, manage & run your agents" : "topic inventory · idea → queued → discussed → published";
+  $("detail").innerHTML = `<div class="empty">${t === "agents" ? "Select an agent to view its work, change its topic, or run it." : "Select a topic, or add one to the inventory."}</div>`;
+  load();
+}
+async function load() {
+  if (tab === "agents") loadAgents(); else loadTopics();
+}
+
+/* ---------------- Agents tab ---------------- */
+async function loadAgents() {
+  try {
+    agents = await api("/agents");
+    renderAgentSidebar();
+    if (selected) selectAgent(selected.id);
+  } catch (e) { $("sidebar").innerHTML = `<div class="empty">⚠ ${esc(e.message)}</div>`; }
+}
+function renderAgentSidebar() {
+  $("sidebar").innerHTML = agents.map((a, i) => `
+    ${i > 0 ? '<div class="arrow">↓</div>' : ""}
+    <div class="card ${selected?.id === a.id ? "active" : ""}" onclick="selectAgent('${a.id}')">
+      <span class="dot ${a.enabled ? "on" : "off"}"></span>
+      <div class="stage">Stage ${a.stage}</div>
+      <h3>${esc(a.name)}</h3>
+      <div class="role">${esc(a.role)}</div>
+    </div>`).join("");
+}
+async function selectAgent(id) {
+  selected = agents.find(a => a.id === id);
+  if (!selected) return;
+  renderAgentSidebar();
+  const a = selected;
+  const cfgFields = Object.entries(a.config || {}).map(([k, v]) => `
+    <label>${esc(k)}</label>
+    ${String(v).length > 80 ? `<textarea data-cfg="${esc(k)}">${esc(v)}</textarea>` : `<input type="text" data-cfg="${esc(k)}" value="${esc(v)}">`}
+  `).join("");
+  $("detail").innerHTML = `
+    <div class="row">
+      <div style="flex:1">
+        <h2>${esc(a.name)} <span class="badge">stage ${a.stage}</span></h2>
+        <div class="muted">${esc(a.role)}</div>
+      </div>
+      <label class="toggle"><input type="checkbox" id="enabled" ${a.enabled ? "checked" : ""}> Enabled</label>
+    </div>
+    <section>
+      <h4>Configuration — topic &amp; behavior</h4>
+      ${cfgFields}
+      <label>Prompt template</label>
+      <textarea id="promptTemplate" style="min-height:160px">${esc(a.promptTemplate)}</textarea>
+      <div class="row" style="margin-top:14px">
+        <button onclick="saveAgent()">💾 Save changes</button>
+        <span class="muted" style="font-size:12px">Last updated: ${esc(a.updatedAt || "—")}</span>
+      </div>
+    </section>
+    <section>
+      <h4>Run agent</h4>
+      <label>${esc(a.inputLabel || "Input")}</label>
+      <textarea id="runInput" placeholder="Paste input here…"></textarea>
+      <div class="row" style="margin-top:12px">
+        <button class="run" id="runBtn" onclick="runAgent()">▶ Run ${esc(a.name)}</button>
+        ${a.stage > 1 ? `<button class="ghost" onclick="loadUpstream()">⤵ Load latest output from previous stage</button>` : ""}
+        <span id="spinner" class="spin" style="display:none">⏳ Running… (can take up to a minute)</span>
+      </div>
+      <div id="runResult"></div>
+    </section>
+    <section>
+      <h4>Work history (latest runs)</h4>
+      <div id="runs" class="empty">Loading…</div>
+    </section>`;
+  loadRuns(a.id);
+}
+async function loadRuns(id) {
+  try {
+    const runs = await api(`/agents/${id}/runs`);
+    $("runs").innerHTML = runs.length ? runs.map(r => `
+      <details class="runitem">
+        <summary>${when(r.createdAt)} · ${(r.durationMs/1000).toFixed(1)}s · ${esc(r.model)}${r.topicId ? " · topic run" : ""}</summary>
+        <div class="output">${esc(r.output)}</div>
+      </details>`).join("") : `<div class="empty">No runs yet.</div>`;
+  } catch (e) { $("runs").innerHTML = `<div class="empty">⚠ ${esc(e.message)}</div>`; }
+}
+async function saveAgent() {
+  const config = {};
+  document.querySelectorAll("[data-cfg]").forEach(el => config[el.dataset.cfg] = el.value);
+  try {
+    await api(`/agents/${selected.id}`, { method: "PUT", body: JSON.stringify({
+      enabled: $("enabled").checked, promptTemplate: $("promptTemplate").value, config,
+    })});
+    toast("Saved ✓"); loadAgents();
+  } catch (e) { toast("Save failed: " + e.message, false); }
+}
+async function runAgent() {
+  const btn = $("runBtn"); btn.disabled = true; $("spinner").style.display = "inline";
+  $("runResult").innerHTML = "";
+  try {
+    const run = await api(`/agents/${selected.id}/run`, { method: "POST", body: JSON.stringify({ input: $("runInput").value }) });
+    $("runResult").innerHTML = `<label>Output</label><div class="output">${esc(run.output)}</div>`;
+    toast("Run complete ✓"); loadRuns(selected.id);
+  } catch (e) { toast("Run failed: " + e.message, false); $("runResult").innerHTML = `<div class="empty">⚠ ${esc(e.message)}</div>`; }
+  btn.disabled = false; $("spinner").style.display = "none";
+}
+async function loadUpstream() {
+  const idx = agents.findIndex(a => a.id === selected.id);
+  const prev = agents[idx - 1];
+  if (!prev) return toast("No previous stage", false);
+  try {
+    const runs = await api(`/agents/${prev.id}/runs`);
+    if (!runs.length) return toast(`No runs yet for ${prev.name}`, false);
+    $("runInput").value = runs[0].output;
+    toast(`Loaded latest ${prev.name} output ✓`);
+  } catch (e) { toast(e.message, false); }
+}
+
+/* ---------------- Topics tab ---------------- */
+async function loadTopics() {
+  try {
+    topics = await api("/topics");
+    renderTopicSidebar();
+    if (selectedTopic) {
+      const fresh = topics.find(t => t.id === selectedTopic.id);
+      if (fresh) selectTopic(fresh.id);
+    }
+  } catch (e) { $("sidebar").innerHTML = `<div class="empty">⚠ ${esc(e.message)}</div>`; }
+}
+function renderTopicSidebar() {
+  const counts = { all: topics.length };
+  STATUSES.forEach(s => counts[s] = topics.filter(t => t.status === s).length);
+  const shown = topicFilter === "all" ? topics : topics.filter(t => t.status === topicFilter);
+  $("sidebar").innerHTML = `
+    <button style="width:100%; margin-bottom:14px" onclick="document.getElementById('newTopic').showModal()">＋ New topic</button>
+    <div class="filterbar">
+      <button class="${topicFilter === "all" ? "" : "ghost"}" onclick="setFilter('all')">All (${counts.all})</button>
+      ${STATUSES.map(s => `<button class="${topicFilter === s ? "" : "ghost"}" onclick="setFilter('${s}')">${STATUS_LABEL[s].split(" ")[1]} (${counts[s]})</button>`).join("")}
+    </div>
+    ${shown.length ? shown.map(t => `
+      <div class="card ${selectedTopic?.id === t.id ? "active" : ""}" onclick="selectTopic('${t.id}')">
+        <h3 style="margin-right:20px">${esc(t.title)}</h3>
+        <div class="row" style="margin-top:6px">
+          <span class="status ${t.status}">${esc(t.status)}</span>
+          ${t.talkingPoints ? '<span class="badge">🗒 talking points</span>' : ""}
+        </div>
+        <div class="role" style="margin-top:6px">updated ${when(t.updatedAt)}</div>
+      </div>`).join("") : `<div class="empty">No topics${topicFilter !== "all" ? ` with status "${topicFilter}"` : ""} yet.</div>`}`;
+}
+function setFilter(f) { topicFilter = f; renderTopicSidebar(); }
+async function createTopic() {
+  const title = $("ntTitle").value.trim();
+  if (!title) return toast("Title required", false);
+  try {
+    const t = await api("/topics", { method: "POST", body: JSON.stringify({ title, description: $("ntDesc").value.trim() }) });
+    $("newTopic").close(); $("ntTitle").value = ""; $("ntDesc").value = "";
+    toast("Topic added to inventory ✓");
+    selectedTopic = t; await loadTopics();
+  } catch (e) { toast(e.message, false); }
+}
+async function selectTopic(id) {
+  selectedTopic = topics.find(t => t.id === id);
+  if (!selectedTopic) return;
+  renderTopicSidebar();
+  const t = selectedTopic;
+  $("detail").innerHTML = `
+    <div class="row">
+      <div style="flex:1">
+        <h2>${esc(t.title)}</h2>
+        <div class="muted">added ${when(t.createdAt)} · id ${esc(t.id)}</div>
+      </div>
+      <span class="status ${t.status}">${esc(t.status)}</span>
+    </div>
+
+    <section>
+      <h4>Status</h4>
+      <div class="row">
+        <select id="statusSel">${STATUSES.map(s => `<option value="${s}" ${t.status === s ? "selected" : ""}>${STATUS_LABEL[s]}</option>`).join("")}</select>
+        <button onclick="updateStatus()">Update status</button>
+        <span class="muted" style="font-size:12px">idea → queued → discussed → published</span>
+      </div>
+    </section>
+
+    <section>
+      <h4>Talking points</h4>
+      ${t.talkingPoints ? `<div class="output">${esc(t.talkingPoints)}</div>` : `<div class="muted">None yet — generate a recording glance-sheet for this topic.</div>`}
+      <div class="row" style="margin-top:12px">
+        <button class="run" id="tpBtn" onclick="genTalkingPoints()">🗒 ${t.talkingPoints ? "Regenerate" : "Generate"} talking points</button>
+        <span id="tpSpin" class="spin" style="display:none">⏳ Running the Talking Points Agent…</span>
+      </div>
+    </section>
+
+    <section>
+      <h4>Description / working notes</h4>
+      <textarea id="descBox">${esc(t.description || "")}</textarea>
+      <div class="row" style="margin-top:10px"><button class="ghost" onclick="saveDesc()">💾 Save description</button></div>
+      <label>Add a note (kept in the activity log)</label>
+      <textarea id="noteBox" placeholder="e.g. Recorded a first take, need a better example for point 3…" style="min-height:60px"></textarea>
+      <div class="row" style="margin-top:10px"><button onclick="addNote()">＋ Add note</button></div>
+    </section>
+
+    <section>
+      <h4>Activity log</h4>
+      <div id="topicLog" class="empty">Loading…</div>
+    </section>`;
+  loadTopicLog(t.id);
+}
+async function loadTopicLog(id) {
+  try {
+    const log = await api(`/topics/${id}/log`);
+    const icon = { created: "✨", status_change: "🔄", note: "📝", talking_points: "🗒" };
+    $("topicLog").innerHTML = log.length ? log.map(l => `
+      <div class="logitem">
+        <span class="when">${when(l.createdAt)}</span>
+        <span>${icon[l.type] || "•"} ${esc(l.detail)}</span>
+      </div>`).join("") : `<div class="empty">No activity yet.</div>`;
+  } catch (e) { $("topicLog").innerHTML = `<div class="empty">⚠ ${esc(e.message)}</div>`; }
+}
+async function updateStatus() {
+  try {
+    await api(`/topics/${selectedTopic.id}`, { method: "PUT", body: JSON.stringify({ status: $("statusSel").value }) });
+    toast("Status updated ✓"); await loadTopics();
+  } catch (e) { toast(e.message, false); }
+}
+async function saveDesc() {
+  try {
+    await api(`/topics/${selectedTopic.id}`, { method: "PUT", body: JSON.stringify({ description: $("descBox").value }) });
+    toast("Description saved ✓"); await loadTopics();
+  } catch (e) { toast(e.message, false); }
+}
+async function addNote() {
+  const note = $("noteBox").value.trim();
+  if (!note) return toast("Write a note first", false);
+  try {
+    await api(`/topics/${selectedTopic.id}`, { method: "PUT", body: JSON.stringify({ note }) });
+    $("noteBox").value = "";
+    toast("Note added ✓"); loadTopicLog(selectedTopic.id);
+  } catch (e) { toast(e.message, false); }
+}
+async function genTalkingPoints() {
+  const btn = $("tpBtn"); btn.disabled = true; $("tpSpin").style.display = "inline";
+  try {
+    await api(`/topics/${selectedTopic.id}/talking-points`, { method: "POST", body: "{}" });
+    toast("Talking points ready ✓"); await loadTopics();
+  } catch (e) { toast(e.message, false); btn.disabled = false; $("tpSpin").style.display = "none"; }
+}
+
+load();
+</script>
+</body>
+</html>
