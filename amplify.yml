@@ -1,0 +1,13 @@
+version: 1
+frontend:
+  phases:
+    build:
+      commands:
+        # Inject the backend Function URL (set API_URL in Amplify environment variables)
+        - sed -i "s|__API_URL__|$API_URL|g" site/index.html
+  artifacts:
+    baseDir: site
+    files:
+      - '**/*'
+  cache:
+    paths: []
